@@ -1,0 +1,133 @@
+paths:
+  corpus_path: data/watts_rag_corpus_clean.txt
+  rag_chunks_path: data/processed/rag_chunks.jsonl
+  index_dir: data/indexes
+  audio_dir: outputs/audio
+  tts_cache_dir: outputs/audio/cache
+  runs_dir: outputs/runs
+  logs_dir: outputs/logs
+
+retrieve:
+  embedding_model: text-embedding-3-small
+  top_k: 3
+
+build_index:
+  embedding_model: text-embedding-3-small
+  embedding_batch_size: 32
+  embedding_sleep_seconds: 0.1
+  embedding_max_retries: 3
+  index_overwrite: false
+
+generate:
+  model: gpt-5.4-mini
+  temperature: 0.2
+  max_output_tokens: 400
+  max_context_chars_per_chunk: 2500
+  system_prompt: >
+    You are a reflective conversational assistant grounded in Alan Watts source material.
+    Answer the user's question using the provided excerpts as your primary basis.
+    Be calm, lucid, and conceptually clear.
+    Do not imitate theatrically.
+    Do not mention transcripts, chunks, retrieval, or source documents.
+    Do not invent outside facts or biography.
+    If the source material supports multiple angles, synthesize them clearly and naturally.
+    Keep the answer concise but meaningful.
+    Respond as Alan Watts speaking directly, not as a narrator describing Alan Watts.
+    Do not say “Alan Watts says,” “Alan Watts would say,” or “Alan Watts often points to.”
+    Speak in first person when appropriate.
+
+speech_rewrite:
+  enabled: true
+  target_max_chars: 1800
+  max_sentences: 12
+
+tts:
+  backend: openai
+  model: gpt-4o-mini-tts
+  voice: onyx
+  instructions: >
+    Speak calmly, warmly, and reflectively, with measured pacing and clear enunciation.
+    Keep the delivery intimate and lecture-like.
+    Avoid theatrical imitation of any real person.
+  response_format: wav
+  speed: 0.92
+  max_input_chars: 3500
+  use_cache: true
+
+audio_postprocess:
+  enabled: true
+  vintage_sample_rate: 16000
+  highpass_hz: 120.0
+  soft_clip_drive: 1.15
+  hiss_level: 0.0025
+  normalize_peak: 0.92
+
+run_artifacts:
+  enabled: true
+  save_latest_audio: true
+  append_history_log: true
+  include_context_json: true
+
+presets:
+  brief_reflective:
+    speech_rewrite:
+      target_max_chars: 900
+      max_sentences: 6
+    tts:
+      speed: 0.96
+      instructions: >
+        Speak calmly and clearly in a concise reflective style.
+        Keep the delivery intimate, natural, and unforced.
+        Avoid theatrical imitation of any real person.
+    audio_postprocess:
+      hiss_level: 0.0015
+      soft_clip_drive: 1.08
+
+  lecture_warm:
+    speech_rewrite:
+      target_max_chars: 1800
+      max_sentences: 12
+    tts:
+      speed: 0.92
+      instructions: >
+        Speak calmly, warmly, and reflectively, with measured pacing and clear enunciation.
+        Keep the delivery intimate and lecture-like.
+        Avoid theatrical imitation of any real person.
+    audio_postprocess:
+      hiss_level: 0.0025
+      soft_clip_drive: 1.15
+
+  deeper_slower:
+    speech_rewrite:
+      target_max_chars: 2200
+      max_sentences: 14
+    tts:
+      speed: 0.86
+      instructions: >
+        Speak slowly, with warmth and patience, allowing gentle pauses between ideas.
+        Keep the tone grounded, intimate, and lecture-like.
+        Avoid theatrical imitation of any real person.
+    audio_postprocess:
+      hiss_level: 0.0022
+      soft_clip_drive: 1.12
+
+  clean_modern:
+    audio_postprocess:
+      enabled: false
+    tts:
+      speed: 0.94
+      instructions: >
+        Speak in a calm, modern, natural voice with clear pacing and very light dramatic coloring.
+        Avoid theatrical imitation of any real person.
+
+  vintage_heavy:
+    speech_rewrite:
+      target_max_chars: 1800
+      max_sentences: 12
+    audio_postprocess:
+      enabled: true
+      vintage_sample_rate: 12000
+      highpass_hz: 150.0
+      soft_clip_drive: 1.22
+      hiss_level: 0.0045
+      normalize_peak: 0.9

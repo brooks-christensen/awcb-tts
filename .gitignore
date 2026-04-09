@@ -1,0 +1,8 @@
+.venv/*
+data/*
+*/__pycache__/*
+outputs/*
+*.tar.gz
+*/__pycache__/
+*_manifest.txt
+*.pyc
