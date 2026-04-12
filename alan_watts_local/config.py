@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -53,14 +53,29 @@ class SpeechRewriteConfig:
 @dataclass
 class TTSConfig:
     backend: str
-    model: str
-    voice: str
-    instructions: str
-    response_format: str
-    speed: float
-    max_input_chars: int
-    use_cache: bool
-    cache_dir: Path
+
+    # OpenAI-style fields
+    model: str | None = None
+    voice: str | None = None
+    instructions: str | None = None
+    response_format: str | None = None
+    max_input_chars: int = 3500
+
+    # Shared/general
+    speed: float = 1.0
+    use_cache: bool = True
+    cache_dir: Path | None = None
+
+    # XTTS-style fields
+    device: str = "cuda"
+    model_dir: Path | None = None
+    model_path: Path | None = None
+    config_path: Path | None = None
+    vocab_path: Path | None = None
+    dvae_path: Path | None = None
+    mel_norm_path: Path | None = None
+    language: str = "en"
+    speaker_wavs: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -178,19 +193,29 @@ def load_config(config_path: str | Path, preset_name: str | None = None) -> Loca
 
     tts = TTSConfig(
         backend=str(tts_raw.get("backend", "openai")).lower(),
-        model=str(tts_raw.get("model", "gpt-4o-mini-tts")),
-        voice=str(tts_raw.get("voice", "onyx")),
-        instructions=str(
-            tts_raw.get(
-                "instructions",
-                "Speak calmly, warmly, and reflectively, with measured pacing and clear enunciation. Avoid theatrical imitation. Keep the tone intimate and lecture-like.",
-            )
+
+        model=tts_raw.get("model"),
+        voice=tts_raw.get("voice"),
+        instructions=tts_raw.get(
+            "instructions",
+            "Speak calmly, warmly, and reflectively, with measured pacing and clear enunciation. Avoid theatrical imitation. Keep the tone intimate and lecture-like.",
         ),
         response_format=str(tts_raw.get("response_format", "wav")).lower(),
-        speed=float(tts_raw.get("speed", 0.92)),
         max_input_chars=int(tts_raw.get("max_input_chars", 3500)),
+
+        speed=float(tts_raw.get("speed", 1.0)),
         use_cache=bool(tts_raw.get("use_cache", True)),
         cache_dir=project_root / paths_raw.get("tts_cache_dir", "outputs/audio/cache"),
+
+        device=str(tts_raw.get("device", "cuda")),
+        model_dir=(Path(tts_raw["model_dir"]).expanduser() if tts_raw.get("model_dir") else None),
+        model_path=(Path(tts_raw["model_path"]).expanduser() if tts_raw.get("model_path") else None),
+        config_path=(Path(tts_raw["config_path"]).expanduser() if tts_raw.get("config_path") else None),
+        vocab_path=(Path(tts_raw["vocab_path"]).expanduser() if tts_raw.get("vocab_path") else None),
+        dvae_path=(Path(tts_raw["dvae_path"]).expanduser() if tts_raw.get("dvae_path") else None),
+        mel_norm_path=(Path(tts_raw["mel_norm_path"]).expanduser() if tts_raw.get("mel_norm_path") else None),
+        language=str(tts_raw.get("language", "en")),
+        speaker_wavs=[str(x) for x in tts_raw.get("speaker_wavs", [])],
     )
 
     audio_postprocess = AudioPostprocessConfig(

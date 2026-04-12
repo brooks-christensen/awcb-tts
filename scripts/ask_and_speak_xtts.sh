@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+source ~/xtts-venv/bin/activate
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,7 +42,7 @@ if [[ -z "$QUERY" ]]; then
   exit 1
 fi
 
-CONFIG_PATH="${AWCB_CONFIG:-config/local_config.yaml}"
+CONFIG_PATH="config/local_config.xtts.yaml"
 
 python -m alan_watts_local.cli \
   --config "$CONFIG_PATH" \

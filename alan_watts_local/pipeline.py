@@ -12,7 +12,6 @@ from openai import OpenAI
 from .config import LocalConfig
 from .indexing import INDEX_FILENAME, MANIFEST_FILENAME, METADATA_FILENAME
 
-
 @dataclass
 class RetrievedChunk:
     rank: int

@@ -59,7 +59,7 @@ tts:
   use_cache: true
 
 audio_postprocess:
-  enabled: true
+  enabled: false
   vintage_sample_rate: 16000
   highpass_hz: 120.0
   soft_clip_drive: 1.15

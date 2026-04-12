@@ -1,0 +1,6 @@
+numpy==1.22.0
+faiss-cpu==1.7.4
+loguru==0.7.3
+openai==2.29.0
+PyYAML==6.0.3
+tqdm==4.67.3

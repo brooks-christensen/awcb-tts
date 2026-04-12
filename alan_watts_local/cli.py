@@ -39,6 +39,8 @@ def parse_args() -> argparse.Namespace:
     speak_parser.add_argument("--play", action="store_true", help="Attempt local playback after synthesis")
     speak_parser.add_argument("--json", action="store_true", help="Emit full JSON instead of plain answer")
     speak_parser.add_argument("--no-save-run", action="store_true", help="Do not save a reproducible run bundle")
+    speak_parser.add_argument("--raw", action="store_true", help="Skip vintage post-processing")
+    speak_parser.add_argument("--vintage", action="store_true", help="Force vintage post-processing")
 
     return parser.parse_args()
 
@@ -132,6 +134,8 @@ def ask_and_speak(
     play: bool,
     emit_json: bool,
     save_run: bool,
+    raw: bool = False,
+    vintage: bool = False,
     preset_name: str | None = None,
 ) -> None:
     from .audio.playback import play_audio_file
@@ -152,18 +156,33 @@ def ask_and_speak(
     speech_text = rewrite_for_speech(answer_text, config.speech_rewrite)
 
     raw_audio_path = config.paths.audio_dir / "latest_raw.wav"
-    final_audio_path = config.paths.audio_dir / "latest_vintage.wav"
+    vintage_audio_path = config.paths.audio_dir / "latest_vintage.wav"
     raw_audio_path.parent.mkdir(parents=True, exist_ok=True)
 
+    use_vintage = config.audio_postprocess.enabled
+    if raw:
+        use_vintage = False
+    elif vintage:
+        use_vintage = True
+
     synthesize_speech(client=client, text=speech_text, config=config.tts, out_path=raw_audio_path)
-    apply_vintage_postprocess(in_path=raw_audio_path, out_path=final_audio_path, config=config.audio_postprocess)
+
+    if use_vintage:
+        apply_vintage_postprocess(
+            in_path=raw_audio_path,
+            out_path=vintage_audio_path,
+            config=config.audio_postprocess,
+        )
+        final_audio_path = vintage_audio_path
+    else:
+        final_audio_path = raw_audio_path
 
     payload = {
         **result,
         "preset_name": config.preset_name,
         "speech_text": speech_text,
-        "tts_model": config.tts.model,
-        "tts_voice": config.tts.voice,
+        "tts_model": getattr(config.tts, "model", getattr(config.tts, "model_path", "xtts_local")),
+        "tts_voice": getattr(config.tts, "voice", "xtts_local"),
         "audio_raw_path": str(raw_audio_path),
         "audio_final_path": str(final_audio_path),
     }
@@ -216,6 +235,8 @@ def main() -> None:
             play=args.play,
             emit_json=args.json,
             save_run=not args.no_save_run,
+            raw=args.raw,
+            vintage=args.vintage,
             preset_name=args.preset,
         )
     else:

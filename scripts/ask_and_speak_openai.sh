@@ -41,7 +41,7 @@ if [[ -z "$QUERY" ]]; then
   exit 1
 fi
 
-CONFIG_PATH="${AWCB_CONFIG:-config/local_config.yaml}"
+CONFIG_PATH="config/local_config.openai.yaml"
 
 python -m alan_watts_local.cli \
   --config "$CONFIG_PATH" \

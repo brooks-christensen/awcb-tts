@@ -42,20 +42,16 @@ speech_rewrite:
   max_sentences: 12
 
 tts:
-  backend: xtts_local
-  device: cuda
-  model_dir: /home/peacelovephysics/awcb-tts/models/xtts/brooks_abd_pilot
-  model_path: /home/peacelovephysics/awcb-tts/models/xtts/brooks_abd_pilot/model.pth
-  config_path: /home/peacelovephysics/awcb-tts/models/xtts/brooks_abd_pilot/config.json
-  vocab_path: /home/peacelovephysics/awcb-tts/models/xtts/brooks_abd_pilot/vocab.json
-  dvae_path: /home/peacelovephysics/awcb-tts/models/xtts/brooks_abd_pilot/dvae.pth
-  mel_norm_path: /home/peacelovephysics/awcb-tts/models/xtts/brooks_abd_pilot/mel_stats.pth
-  language: en
-  speaker_wavs:
-    - /mnt/c/Users/Brooks/Documents/Audacity/brooks_tts/combined_abd_xtts_dataset/wavs/ls_a1.wav
-    - /mnt/c/Users/Brooks/Documents/Audacity/brooks_tts/combined_abd_xtts_dataset/wavs/ls_b1.wav
-    - /mnt/c/Users/Brooks/Documents/Audacity/brooks_tts/combined_abd_xtts_dataset/wavs/ls_d1.wav
+  backend: openai
+  model: gpt-4o-mini-tts
+  voice: onyx
+  instructions: >
+    Speak calmly, warmly, and reflectively, with measured pacing and clear enunciation.
+    Keep the delivery intimate and lecture-like.
+    Avoid theatrical imitation of any real person.
+  response_format: wav
   speed: 0.92
+  max_input_chars: 3500
   use_cache: true
 
 audio_postprocess:

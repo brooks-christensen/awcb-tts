@@ -6,3 +6,7 @@ outputs/*
 */__pycache__/
 *_manifest.txt
 *.pyc
+models/
+notebooks/
+*.wav
+tar_files/
