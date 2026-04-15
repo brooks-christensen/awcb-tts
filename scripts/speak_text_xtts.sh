@@ -7,14 +7,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "$REPO_ROOT"
 
-if [[ $# -lt 1 ]]; then
-  echo "Usage: bash scripts/ask_and_speak_xtts.sh "Your question" [--preset PRESET] [other CLI args]"
-  exit 1
-fi
-
-QUERY=""
+QUERY_ARGS=()
 PRESET_ARGS=()
-OTHER_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -27,21 +21,16 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     *)
-      if [[ -z "$QUERY" ]]; then
-        QUERY="$1"
-      else
-        OTHER_ARGS+=("$1")
-      fi
+      QUERY_ARGS+=("$1")
       shift
       ;;
   esac
 done
 
-if [[ -z "$QUERY" ]]; then
-  echo "ERROR: missing query"
-  exit 1
-fi
-
 CONFIG_PATH="${AWCB_CONFIG:-config/local_config.xtts.yaml}"
 
-python -m alan_watts_local.cli   --config "$CONFIG_PATH"   "${PRESET_ARGS[@]}"   ask-and-speak   --query "$QUERY"   "${OTHER_ARGS[@]}"
+python -m alan_watts_local.cli \
+  --config "$CONFIG_PATH" \
+  "${PRESET_ARGS[@]}" \
+  speak-text \
+  "${QUERY_ARGS[@]}"

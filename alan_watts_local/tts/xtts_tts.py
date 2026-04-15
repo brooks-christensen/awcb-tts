@@ -36,6 +36,9 @@ class XTTSTTS:
         ).to(device)
 
     def synthesize(self, text: str, out_path: str) -> str:
+        out_path = Path(out_path).expanduser()
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
         speaker_wavs = _get(self.cfg, "speaker_wavs")
         language = _get(self.cfg, "language", "en")
 

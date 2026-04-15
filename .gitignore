@@ -10,3 +10,4 @@ models/
 notebooks/
 *.wav
 tar_files/
+original_*

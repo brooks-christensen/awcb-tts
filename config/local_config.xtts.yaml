@@ -2,10 +2,10 @@ paths:
   corpus_path: data/watts_rag_corpus_clean.txt
   rag_chunks_path: data/processed/rag_chunks.jsonl
   index_dir: data/indexes
-  audio_dir: outputs/audio
-  tts_cache_dir: outputs/audio/cache
-  runs_dir: outputs/runs
-  logs_dir: outputs/logs
+  audio_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/audio
+  tts_cache_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/audio/cache
+  runs_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/runs
+  logs_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/logs
 
 retrieve:
   embedding_model: text-embedding-3-small

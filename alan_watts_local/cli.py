@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,48 @@ from .run_artifacts import save_run_bundle
 
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "local_config.yaml"
+
+
+def _slugify(value: str, max_len: int = 60) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", value.strip().lower()).strip("-")
+    if not slug:
+        return "tts"
+    return slug[:max_len].strip("-") or "tts"
+
+
+def _read_text_input(*, text: str | None, text_file: str | None) -> str:
+    if bool(text) == bool(text_file):
+        raise ValueError("Provide exactly one of --text or --text-file.")
+    if text is not None:
+        value = text.strip()
+    else:
+        value = Path(text_file).expanduser().read_text(encoding="utf-8").strip()
+    if not value:
+        raise ValueError("Input text is empty.")
+    return value
+
+
+def _build_audio_paths(
+    *,
+    audio_root: Path,
+    stem: str | None,
+    text_hint: str,
+    use_vintage: bool,
+) -> tuple[Path, Path]:
+    now = datetime.now()
+    date_dir = audio_root / now.strftime("%Y-%m-%d")
+    date_dir.mkdir(parents=True, exist_ok=True)
+
+    base_name = _slugify(stem or text_hint)
+    timestamp = now.strftime("%Y%m%d_%H%M%S")
+    raw_path = date_dir / f"{timestamp}_{base_name}_raw.wav"
+
+    if use_vintage:
+        final_path = date_dir / f"{timestamp}_{base_name}_vintage.wav"
+    else:
+        final_path = raw_path
+
+    return raw_path, final_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,6 +85,19 @@ def parse_args() -> argparse.Namespace:
     speak_parser.add_argument("--no-save-run", action="store_true", help="Do not save a reproducible run bundle")
     speak_parser.add_argument("--raw", action="store_true", help="Skip vintage post-processing")
     speak_parser.add_argument("--vintage", action="store_true", help="Force vintage post-processing")
+    speak_parser.add_argument("--out-dir", default=None, help="Override audio output directory for this run")
+    speak_parser.add_argument("--stem", default=None, help="Optional filename stem for generated audio")
+
+    synth_parser = subparsers.add_parser("speak-text", help="Generate speech directly from provided text")
+    text_group = synth_parser.add_mutually_exclusive_group(required=True)
+    text_group.add_argument("--text", help="Inline text to synthesize")
+    text_group.add_argument("--text-file", help="Path to a UTF-8 text file to synthesize")
+    synth_parser.add_argument("--play", action="store_true", help="Attempt local playback after synthesis")
+    synth_parser.add_argument("--json", action="store_true", help="Emit JSON metadata instead of plain text")
+    synth_parser.add_argument("--raw", action="store_true", help="Skip vintage post-processing")
+    synth_parser.add_argument("--vintage", action="store_true", help="Force vintage post-processing")
+    synth_parser.add_argument("--out-dir", default=None, help="Override audio output directory for this run")
+    synth_parser.add_argument("--stem", default=None, help="Optional filename stem for generated audio")
 
     return parser.parse_args()
 
@@ -136,6 +193,8 @@ def ask_and_speak(
     save_run: bool,
     raw: bool = False,
     vintage: bool = False,
+    out_dir: str | None = None,
+    stem: str | None = None,
     preset_name: str | None = None,
 ) -> None:
     from .audio.playback import play_audio_file
@@ -155,27 +214,28 @@ def ask_and_speak(
     answer_text = result["answer"]
     speech_text = rewrite_for_speech(answer_text, config.speech_rewrite)
 
-    raw_audio_path = config.paths.audio_dir / "latest_raw.wav"
-    vintage_audio_path = config.paths.audio_dir / "latest_vintage.wav"
-    raw_audio_path.parent.mkdir(parents=True, exist_ok=True)
-
     use_vintage = config.audio_postprocess.enabled
     if raw:
         use_vintage = False
     elif vintage:
         use_vintage = True
 
+    audio_root = Path(out_dir).expanduser() if out_dir else config.paths.audio_dir
+    raw_audio_path, final_audio_path = _build_audio_paths(
+        audio_root=audio_root,
+        stem=stem,
+        text_hint=query,
+        use_vintage=use_vintage,
+    )
+
     synthesize_speech(client=client, text=speech_text, config=config.tts, out_path=raw_audio_path)
 
     if use_vintage:
         apply_vintage_postprocess(
             in_path=raw_audio_path,
-            out_path=vintage_audio_path,
+            out_path=final_audio_path,
             config=config.audio_postprocess,
         )
-        final_audio_path = vintage_audio_path
-    else:
-        final_audio_path = raw_audio_path
 
     payload = {
         **result,
@@ -212,6 +272,65 @@ def ask_and_speak(
         play_audio_file(final_audio_path)
 
 
+def speak_text(
+    config_path: str | Path,
+    text: str | None,
+    text_file: str | None,
+    play: bool,
+    emit_json: bool,
+    raw: bool = False,
+    vintage: bool = False,
+    out_dir: str | None = None,
+    stem: str | None = None,
+    preset_name: str | None = None,
+) -> None:
+    from .audio.playback import play_audio_file
+    from .audio.postprocess import apply_vintage_postprocess
+    from .tts import synthesize_speech
+
+    config = load_config(config_path, preset_name=preset_name)
+    input_text = _read_text_input(text=text, text_file=text_file)
+
+    use_vintage = config.audio_postprocess.enabled
+    if raw:
+        use_vintage = False
+    elif vintage:
+        use_vintage = True
+
+    audio_root = Path(out_dir).expanduser() if out_dir else config.paths.audio_dir
+    raw_audio_path, final_audio_path = _build_audio_paths(
+        audio_root=audio_root,
+        stem=stem,
+        text_hint=input_text,
+        use_vintage=use_vintage,
+    )
+
+    synthesize_speech(client=None, text=input_text, config=config.tts, out_path=raw_audio_path)
+
+    if use_vintage:
+        apply_vintage_postprocess(
+            in_path=raw_audio_path,
+            out_path=final_audio_path,
+            config=config.audio_postprocess,
+        )
+
+    payload = {
+        "preset_name": config.preset_name,
+        "text": input_text,
+        "audio_raw_path": str(raw_audio_path),
+        "audio_final_path": str(final_audio_path),
+        "used_vintage": use_vintage,
+    }
+
+    if emit_json:
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(f"Audio saved to: {final_audio_path}")
+
+    if play:
+        play_audio_file(final_audio_path)
+
+
 def main() -> None:
     args = parse_args()
     if args.command == "prepare":
@@ -237,6 +356,21 @@ def main() -> None:
             save_run=not args.no_save_run,
             raw=args.raw,
             vintage=args.vintage,
+            out_dir=args.out_dir,
+            stem=args.stem,
+            preset_name=args.preset,
+        )
+    elif args.command == "speak-text":
+        speak_text(
+            config_path=args.config,
+            text=args.text,
+            text_file=args.text_file,
+            play=args.play,
+            emit_json=args.json,
+            raw=args.raw,
+            vintage=args.vintage,
+            out_dir=args.out_dir,
+            stem=args.stem,
             preset_name=args.preset,
         )
     else:
