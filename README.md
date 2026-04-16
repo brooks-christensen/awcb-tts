@@ -1,40 +1,49 @@
 # Alan Watts Local RAG + TTS
 
-A local Alan Watts-inspired question-answering pipeline that:
+A local Alan Watts-inspired question-answering and speech-generation pipeline that can:
 
-1. retrieves relevant Alan Watts source material from a local FAISS index,
-2. generates a grounded answer with an OpenAI text model,
-3. rewrites the answer slightly for spoken delivery,
-4. synthesizes speech using either:
-   - the OpenAI TTS pipeline, or
-   - a locally fine-tuned XTTS model,
-5. optionally applies vintage-style post-processing.
+1. retrieve relevant Alan Watts source material from a local FAISS index,
+2. generate a grounded answer with an OpenAI text model,
+3. optionally rewrite the answer for spoken delivery,
+4. synthesize speech using either:
+   - an OpenAI TTS backend, or
+   - a local fine-tuned XTTS backend,
+5. optionally apply vintage-style post-processing,
+6. save reproducible run artifacts for later comparison.
 
-This README is written for the current practical workflow of this repo: a stable OpenAI-backed path, plus a local XTTS path for private use and experimentation.
+This README reflects the current practical workflow of the repo:
+
+- a stable OpenAI-backed path,
+- a local XTTS path for personal/private use,
+- and a standalone **speak-text** workflow for generating audio directly from user-provided text without running retrieval or answer generation.
 
 ---
 
 ## What this repo can do
 
-There are two main speech backends.
+There are now **three** main usage patterns.
 
-### 1. OpenAI speech backend
-Use this when you want the easiest and most stable path.
+### 1. Ask a question and get text only
+Use the local RAG + OpenAI generation path without speech.
 
-- text retrieval is local
-- text generation uses OpenAI
-- speech synthesis uses OpenAI TTS
-- easiest setup
-- best choice for a clean fallback path
+### 2. Ask a question and get synthesized speech
+Use the full pipeline:
 
-### 2. Local XTTS backend
-Use this when you want the answer spoken in your own fine-tuned voice.
+- retrieval is local,
+- answer generation uses OpenAI,
+- speech synthesis uses either OpenAI TTS or local XTTS,
+- run artifacts can be saved automatically.
 
-- text retrieval is local
-- text generation uses OpenAI
-- speech synthesis is local via Coqui XTTS
-- requires a dedicated XTTS-compatible Python environment
-- best for private/local experiments
+### 3. Generate speech directly from supplied text
+Use the standalone speech path when you already have text and only want audio output.
+
+This is especially useful for:
+
+- smoke testing the XTTS model,
+- reading arbitrary text aloud,
+- comparing presets,
+- generating short narration clips,
+- testing post-processing independently of the RAG pipeline.
 
 ---
 
@@ -44,12 +53,15 @@ At a high level:
 
 - `alan_watts_local/cli.py` orchestrates the workflow
 - `alan_watts_local/pipeline.py` handles retrieval + generation
+- `alan_watts_local/speech_rewrite.py` adapts answers for spoken delivery
+- `alan_watts_local/run_artifacts.py` saves reproducible outputs
 - `alan_watts_local/tts/` contains backend-specific speech synthesis code
 - `config/local_config.*.yaml` controls behavior
 - `scripts/ask_and_speak_openai.sh` runs the OpenAI TTS path
-- `scripts/ask_and_speak_xtts.sh` runs the XTTS path
+- `scripts/ask_and_speak_xtts.sh` runs the XTTS question-answer + speech path
+- `scripts/speak_text_xtts.sh` runs the standalone XTTS text-to-speech path
 
-The XTTS backend should be treated as a local/private feature unless you have already thought through hosting cost, latency, abuse controls, and model-license constraints.
+The XTTS backend should be treated as a local/private feature unless you have already thought through hosting cost, latency, abuse controls, and license constraints.
 
 ---
 
@@ -96,8 +108,11 @@ awcb-tts/
 │   └── runs/
 └── scripts/
     ├── ask_and_speak_openai.sh
-    └── ask_and_speak_xtts.sh
+    ├── ask_and_speak_xtts.sh
+    └── speak_text_xtts.sh
 ```
+
+Depending on your config, output artifacts may be written inside the repo or redirected to a Windows-mounted folder such as `/mnt/c/Users/<name>/Documents/...`.
 
 ---
 
@@ -115,7 +130,7 @@ Typical dependencies include:
 - `PyYAML`
 - `loguru`
 - `numpy`
-- whatever else your local app already uses
+- any other app-specific dependencies already used by the local pipeline
 
 ### B. XTTS environment
 Use this for the local XTTS backend.
@@ -124,13 +139,13 @@ This environment needs:
 
 - Coqui TTS / XTTS-compatible dependencies
 - the local app runtime dependencies too
-- a NumPy version that remains compatible with the TTS stack
+- a NumPy version compatible with the TTS stack
 
-In practice, the XTTS environment often needs more careful pinning than the main app environment.
+In practice, the XTTS environment often needs tighter pinning than the main app environment.
 
 ---
 
-## Core local workflow
+## Core workflows
 
 ### 1. Build or rebuild the local index
 
@@ -143,7 +158,10 @@ If the index already exists, the CLI usually detects that and skips unnecessary 
 ### 2. Ask a text-only question
 
 ```bash
-python -m alan_watts_local.cli --config config/local_config.openai.yaml ask --query "What is the self?"
+python -m alan_watts_local.cli \
+  --config config/local_config.openai.yaml \
+  ask \
+  --query "What is the self?"
 ```
 
 ### 3. Ask and synthesize speech with OpenAI
@@ -158,11 +176,116 @@ bash scripts/ask_and_speak_openai.sh "What is the self?"
 bash scripts/ask_and_speak_xtts.sh "What is the self?"
 ```
 
+### 5. Generate speech directly from input text with XTTS
+
+```bash
+bash scripts/speak_text_xtts.sh --text "Hello from Brooks."
+```
+
+### 6. Generate speech from a text file with XTTS
+
+```bash
+bash scripts/speak_text_xtts.sh --text-file /path/to/input.txt
+```
+
+---
+
+## Standalone speak-text feature
+
+The standalone **speak-text** feature is the simplest way to use the fine-tuned XTTS model directly.
+
+It skips:
+
+- retrieval,
+- OpenAI answer generation,
+- speech rewriting tied to the RAG flow.
+
+It only does:
+
+- environment activation,
+- config loading,
+- XTTS synthesis,
+- optional preset selection,
+- organized audio output.
+
+### Typical uses
+
+- quick voice smoke tests,
+- reading arbitrary text aloud,
+- checking pacing and tone,
+- comparing presets like `clean_modern` vs `lecture_warm`,
+- generating local narration clips.
+
+### Example commands
+
+#### Inline text
+
+```bash
+bash scripts/speak_text_xtts.sh --text "Hello from Brooks." --preset clean_modern
+```
+
+#### Text file input
+
+```bash
+bash scripts/speak_text_xtts.sh \
+  --text-file /mnt/c/Users/Brooks/Documents/test_tts.txt \
+  --preset lecture_warm
+```
+
+#### Explicit CLI form
+
+```bash
+python -m alan_watts_local.cli \
+  --config config/local_config.xtts.yaml \
+  --preset clean_modern \
+  speak-text \
+  --text "Hello from Brooks."
+```
+
+### Output behavior
+
+The standalone speak path is intended to write timestamped WAV files rather than reusing a single `latest_*.wav` file.
+
+A practical output pattern is:
+
+```text
+/mnt/c/Users/Brooks/Documents/awcb_tts/outputs/audio/YYYY-MM-DD/
+  20260414_183505_hello-from-brooks_raw.wav
+```
+
+This keeps generated audio:
+
+- organized by day,
+- easy to browse from Windows,
+- outside the WSL disk image when desired,
+- safe from accidental overwrite.
+
+---
+
+## Output storage strategy
+
+For this repo, the most practical setup is usually:
+
+- keep code and models in WSL,
+- keep generated artifacts on the Windows side.
+
+That means configuring paths such as:
+
+```yaml
+paths:
+  audio_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/audio
+  tts_cache_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/audio/cache
+  runs_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/runs
+  logs_dir: /mnt/c/Users/Brooks/Documents/awcb_tts/outputs/logs
+```
+
+This helps prevent unnecessary growth of the WSL virtual disk while keeping outputs easy to access from the Windows desktop environment.
+
 ---
 
 ## Configuration strategy
 
-A good stable setup is to keep separate config files:
+A stable setup is to keep separate config files:
 
 - `config/local_config.openai.yaml`
 - `config/local_config.xtts.yaml`
@@ -172,16 +295,17 @@ That way you do not have to constantly overwrite one working configuration with 
 ### OpenAI config
 Use the OpenAI config when:
 
-- you want the fallback path
-- you want easier debugging
-- you want a known-stable synthesis path
+- you want the fallback path,
+- you want easier debugging,
+- you want a known-stable synthesis path.
 
 ### XTTS config
 Use the XTTS config when:
 
-- you want local speech synthesis
-- you want your fine-tuned voice
-- you are doing local/private experiments
+- you want local speech synthesis,
+- you want your fine-tuned voice,
+- you are doing local/private experiments,
+- you want to use the standalone speak-text path.
 
 ---
 
@@ -244,9 +368,9 @@ python -m alan_watts_local.cli \
 
 Use the OpenAI path when:
 
-- the XTTS environment is being debugged
-- you want a stable comparison path
-- you want a simple way to verify retrieval/generation independent of local voice synthesis
+- the XTTS environment is being debugged,
+- you want a stable comparison path,
+- you want a simple way to verify retrieval/generation independent of local voice synthesis.
 
 ---
 
@@ -269,6 +393,18 @@ The XTTS shell script should:
 - activate the XTTS environment,
 - point to `config/local_config.xtts.yaml`,
 - run `python -m alan_watts_local.cli ...`.
+
+### XTTS standalone speak-text shell script
+
+```bash
+bash scripts/speak_text_xtts.sh --text "Hello from Brooks." --preset clean_modern
+```
+
+This is the best first test when:
+
+- you only want to verify XTTS loading,
+- you want to compare presets,
+- you do not want retrieval or generation in the loop.
 
 ---
 
@@ -467,22 +603,6 @@ Always test the model alone before debugging the whole chatbot pipeline.
 
 ---
 
-## Suggested config architecture
-
-A good long-term cleanup is:
-
-- one unified `TTSConfig` dataclass that supports both OpenAI and XTTS fields
-- deep preset merge instead of shallow overwrite
-- lazy imports in `alan_watts_local/tts/__init__.py`
-- no hardcoded XTTS rescue paths once config loading is fixed
-
-This avoids the common failure mode where:
-
-- `backend` survives,
-- but XTTS-specific fields like `model_dir` are silently dropped.
-
----
-
 ## Recommended preset strategy
 
 Use presets for:
@@ -494,46 +614,6 @@ Use presets for:
 Do **not** let presets accidentally wipe out the entire XTTS config block.
 
 That means your config loader should apply presets with a **deep merge**.
-
----
-
-## Does Section C help?
-
-Probably yes, but only if you add it carefully.
-
-### Section C is likely worth adding if:
-
-- it contains longer, smoother lecture-style phrasing
-- it is cleanly segmented
-- the text/audio alignment is trustworthy
-- it introduces useful cadence variation without adding noise
-
-### Section C may help with:
-
-- longer sentence carry-through
-- more natural phrase transitions
-- lecture-like pacing
-- reducing the “assembled from short clips” feeling
-
-### Section C may **not** help if:
-
-- the clips are noisy or poorly segmented
-- the alignment is inconsistent
-- the dataset starts mixing too many recording conditions
-
-### Practical recommendation
-
-Do **not** dump all of Section C in blindly.
-
-Instead:
-
-1. curate a small clean subset first,
-2. fine-tune or continue-training with that subset added,
-3. compare raw output before and after.
-
-Because your current model is already working well, the right question is no longer “can we make it work at all?” but “does Section C improve transitions without degrading clarity?”
-
-That should be tested empirically.
 
 ---
 
@@ -549,7 +629,7 @@ If you hear odd artifacts between sentences, the cause may be one of several thi
 
 ### Best debugging order
 
-1. compare `latest_raw.wav` vs processed output
+1. compare raw output vs processed output
 2. test with post-processing disabled
 3. test shorter answers
 4. inspect whether the speech rewrite creates abrupt sentence boundaries
@@ -576,24 +656,14 @@ That is useful for comparing outputs across:
 - vintage vs raw
 - different XTTS checkpoints
 
----
+A typical run bundle contains files such as:
 
-## Practical recommendations going forward
-
-### Best current default
-
-- use XTTS locally
-- keep post-processing off by default
-- use `--vintage` only for experiments
-- treat `best_model_24570.pth` or whichever best checkpoint won validation as the canonical model until a better one is proven
-
-### Best next experiments
-
-1. compare raw vs vintage on the same prompt
-2. inspect sentence-boundary artifacts on raw audio
-3. add a small clean subset of Section C
-4. retrain and compare A/B
-5. keep the OpenAI path as a reliability fallback
+- `query.txt`
+- `answer.txt`
+- `speech_text.txt`
+- `response.json`
+- `config_snapshot.yaml`
+- copied audio artifacts
 
 ---
 
@@ -629,6 +699,18 @@ bash scripts/ask_and_speak_xtts.sh "What is the self?"
 bash scripts/ask_and_speak_xtts.sh "What is the self?" --preset lecture_warm
 ```
 
+### XTTS standalone speak with inline text
+
+```bash
+bash scripts/speak_text_xtts.sh --text "Hello from Brooks." --preset clean_modern
+```
+
+### XTTS standalone speak from a text file
+
+```bash
+bash scripts/speak_text_xtts.sh --text-file /path/to/input.txt --preset lecture_warm
+```
+
 ### Force raw / clean output
 
 ```bash
@@ -643,15 +725,40 @@ bash scripts/ask_and_speak_xtts.sh "What is the self?" --vintage
 
 ---
 
+## Handoff notes for another coder
+
+This repo is now in good shape as a **technical handoff document**, but it is **not fully clone-and-run portable** without local edits.
+
+Another coder should be able to understand the architecture and workflow from this README, but they will still need to adapt:
+
+- absolute paths in `config/local_config*.yaml`
+- the XTTS virtual environment name and activation path
+- local model and speaker-reference file locations
+- any private or unpublished corpus assets
+- OpenAI credentials and environment setup
+
+If you want a truly portable handoff, the next cleanup step is to replace machine-specific absolute paths with environment variables or a checked-in example config.
+
+### Recommended portability cleanup
+
+1. add `config/local_config.example.yaml`
+2. move machine-specific paths into environment variables or ignored local config files
+3. document exact dependency install commands for both environments
+4. document required local assets explicitly
+5. rename any misleading artifact filenames if needed
+
+---
+
 ## Final note
 
 At this point, the project has crossed the line from “interesting experiment” into “working local system.”
 
-The main remaining work is no longer basic viability. It is refinement:
+The remaining work is mostly refinement:
 
-- cleaner config handling
+- cleaner config portability
 - smoother sentence transitions
-- thoughtful use of Section C
-- and clearer separation between raw voice quality and stylistic post-processing
+- clearer environment setup instructions
+- better separation between personal local paths and repo defaults
+- continued evaluation of raw voice quality vs stylistic post-processing
 
 That is a good place to be.
